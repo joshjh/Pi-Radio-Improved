@@ -125,25 +125,44 @@ class Radio(object):
                 self.stop()
             self.cad.lcd.backlight_off()
             self.cad.lcd.clear()
-            self.cad.lcd.set_cursor(0,0)
+            self.cad.lcd.set_cursor(0, 0)
             self.cad.lcd.write('RADIO SUSPENDED')
             self.suspended = True
 
         else:
-            if not self.playing:
+            if not self.playing and self.suspended:
                 self.cad.lcd.clear()
                 self.cad.lcd.backlight_on()
                 self.play()
                 self.suspended = False
 
+    def tick_message(self, message):
+        """ Ticks a message that is too long to lcd.write()"""
+        loops = 2
+        txt = message.ljust(LCD_WIDTH)
+        ticks = len(message) - LCD_WIDTH + 1
+        self.cad.lcd.set_cursor(0, 1)
+        self.cad.lcd.write(txt[:LCD_WIDTH])
+        y = 0
+        while y < loops:
+            y += 1
+            for x in range(0, ticks):
+                sleep(0.5)
+                self.cad.lcd.set_cursor(0, 1)
+                self.cad.lcd.write(txt[x:LCD_WIDTH + x])
+
     def change_station(self, new_station_index):
         """Change the station index."""
-        was_playing = self.playing
-        if was_playing:
-            self.stop()
-        self.current_station_index = new_station_index % len(STATIONS)
-        if was_playing:
-            self.play()
+        if not self.suspended:
+            was_playing = self.playing
+            if was_playing:
+                self.stop()
+            self.current_station_index = new_station_index % len(STATIONS)
+            if was_playing:
+                self.play()
+        else:
+            self.cad.lcd.set_cursor(0, 2)
+            self.tick_message ('Cannot operate whist suspended')
 
     def next_station(self, event=None):
         self.change_station(self.current_station_index + 1)
@@ -175,7 +194,10 @@ class Radio(object):
         self.cad.lcd.write(message)
 
     def toggle_playing(self, event=None):
-        if self.playing:
+        if self.suspended:
+             self.cad.lcd.set_cursor(0, 2)
+             self.cad.lcd.write('Cannot operate whist suspended')
+        elif self.playing:
             self.stop()
         else:
             self.play()
@@ -184,7 +206,6 @@ class Radio(object):
         self.stop()
         self.cad.lcd.clear()
         self.cad.lcd.backlight_off()
-
 
 def radio_preset_switch(event):
     global radio
